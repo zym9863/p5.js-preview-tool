@@ -648,7 +648,300 @@ function draw() {
   }
 }
 
+// PWA 功能管理类
+class PWAManager {
+  constructor() {
+    this.deferredPrompt = null;
+    this.isInstalled = false;
+    this.initializePWA();
+  }
+
+  // 初始化PWA功能
+  async initializePWA() {
+    try {
+      // 注册 Service Worker
+      await this.registerServiceWorker();
+      
+      // 监听安装提示事件
+      this.setupInstallPrompt();
+      
+      // 检查是否已安装
+      this.checkInstallStatus();
+      
+      // 设置URL参数处理
+      this.handleURLParams();
+      
+      console.log('PWA: 初始化完成');
+    } catch (error) {
+      console.error('PWA: 初始化失败:', error);
+    }
+  }
+
+  // 注册 Service Worker
+  async registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.register('./sw.js');
+        console.log('PWA: Service Worker 注册成功:', registration.scope);
+        
+        // 监听更新
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // 新版本可用
+              this.showUpdateNotification();
+            }
+          });
+        });
+        
+        return registration;
+      } catch (error) {
+        console.error('PWA: Service Worker 注册失败:', error);
+        throw error;
+      }
+    } else {
+      console.warn('PWA: 浏览器不支持 Service Worker');
+    }
+  }
+
+  // 设置安装提示
+  setupInstallPrompt() {
+    // 监听安装提示事件
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // 阻止默认的安装提示
+      e.preventDefault();
+      this.deferredPrompt = e;
+      
+      // 显示自定义安装按钮
+      this.showInstallButton();
+    });
+    
+    // 监听应用安装事件
+    window.addEventListener('appinstalled', () => {
+      console.log('PWA: 应用已安装');
+      this.isInstalled = true;
+      this.hideInstallButton();
+      this.deferredPrompt = null;
+    });
+  }
+
+  // 检查安装状态
+  checkInstallStatus() {
+    // 检查是否在独立模式下运行（已安装）
+    if (window.matchMedia('(display-mode: standalone)').matches || 
+        window.navigator.standalone === true) {
+      this.isInstalled = true;
+      console.log('PWA: 应用运行在独立模式');
+    }
+  }
+
+  // 显示安装按钮
+  showInstallButton() {
+    // 检查是否已存在安装按钮
+    if (document.getElementById('pwa-install-btn')) return;
+    
+    // 创建安装按钮
+    const installBtn = document.createElement('button');
+    installBtn.id = 'pwa-install-btn';
+    installBtn.className = 'btn btn-primary pwa-install-btn';
+    installBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7,10 12,15 17,10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+      安装应用
+    `;
+    installBtn.title = '安装到设备';
+    
+    // 添加点击事件
+    installBtn.addEventListener('click', () => this.promptInstall());
+    
+    // 添加到工具栏
+    const toolbar = document.querySelector('.toolbar-right');
+    if (toolbar) {
+      toolbar.appendChild(installBtn);
+    }
+  }
+
+  // 隐藏安装按钮
+  hideInstallButton() {
+    const installBtn = document.getElementById('pwa-install-btn');
+    if (installBtn) {
+      installBtn.remove();
+    }
+  }
+
+  // 提示安装
+  async promptInstall() {
+    if (!this.deferredPrompt) return;
+    
+    try {
+      // 显示安装提示
+      this.deferredPrompt.prompt();
+      
+      // 等待用户响应
+      const { outcome } = await this.deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('PWA: 用户接受安装');
+      } else {
+        console.log('PWA: 用户拒绝安装');
+      }
+      
+      this.deferredPrompt = null;
+    } catch (error) {
+      console.error('PWA: 安装提示失败:', error);
+    }
+  }
+
+  // 显示更新通知
+  showUpdateNotification() {
+    // 创建更新通知
+    const notification = document.createElement('div');
+    notification.className = 'pwa-update-notification';
+    notification.innerHTML = `
+      <div class="update-content">
+        <span>有新版本可用</span>
+        <button class="btn btn-primary btn-sm" onclick="window.location.reload()">
+          更新
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="this.parentElement.parentElement.remove()">
+          稍后
+        </button>
+      </div>
+    `;
+    
+    // 添加样式
+    const style = document.createElement('style');
+    style.textContent = `
+      .pwa-update-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #6366f1;
+        color: white;
+        padding: 16px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        font-size: 14px;
+      }
+      
+      .update-content {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      
+      .pwa-install-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        padding: 8px 16px;
+        background: #10b981;
+        border: none;
+        border-radius: 6px;
+        color: white;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+      
+      .pwa-install-btn:hover {
+        background: #059669;
+      }
+    `;
+    
+    document.head.appendChild(style);
+    document.body.appendChild(notification);
+    
+    // 自动移除通知
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 10000);
+  }
+
+  // 处理URL参数
+  handleURLParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const action = urlParams.get('action');
+    
+    switch (action) {
+      case 'new':
+        // 新建项目
+        if (window.p5PreviewTool) {
+          window.p5PreviewTool.clearCode();
+        }
+        break;
+        
+      case 'examples':
+        // 显示示例
+        const sidebar = document.querySelector('.sidebar');
+        if (sidebar) {
+          sidebar.scrollIntoView({ behavior: 'smooth' });
+        }
+        break;
+    }
+  }
+
+  // 获取缓存信息
+  async getCacheInfo() {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      return new Promise((resolve) => {
+        const messageChannel = new MessageChannel();
+        
+        messageChannel.port1.onmessage = (event) => {
+          resolve(event.data);
+        };
+        
+        navigator.serviceWorker.controller.postMessage(
+          { action: 'GET_CACHE_INFO' },
+          [messageChannel.port2]
+        );
+      });
+    }
+    return null;
+  }
+
+  // 清理缓存
+  async clearCache() {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      return new Promise((resolve) => {
+        const messageChannel = new MessageChannel();
+        
+        messageChannel.port1.onmessage = (event) => {
+          resolve(event.data.success);
+        };
+        
+        navigator.serviceWorker.controller.postMessage(
+          { action: 'CLEAR_CACHE' },
+          [messageChannel.port2]
+        );
+      });
+    }
+    return false;
+  }
+}
+
 // 初始化应用
 document.addEventListener('DOMContentLoaded', () => {
-  new P5PreviewTool();
+  // 初始化主应用
+  window.p5PreviewTool = new P5PreviewTool();
+  
+  // 初始化PWA功能
+  window.pwaManager = new PWAManager();
+});
+
+// PWA相关事件监听
+window.addEventListener('online', () => {
+  console.log('PWA: 网络连接恢复');
+});
+
+window.addEventListener('offline', () => {
+  console.log('PWA: 网络连接断开，应用仍可离线使用');
 });
