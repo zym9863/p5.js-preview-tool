@@ -46,8 +46,8 @@ Simply open the `index.html` file to use in your browser.
 
 1. **Clone or Download Project**
    ```bash
-   git clone https://github.com/zym9863/p5js-preview-tool.git
-   cd p5js-preview-tool
+   git clone https://github.com/zym9863/p5.js-preview-tool.git
+   cd p5.js-preview-tool
    ```
 
 2. **Start Local Server** (optional)

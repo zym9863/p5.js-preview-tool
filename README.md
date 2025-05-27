@@ -46,8 +46,8 @@ Language: [English](README_EN.md) | 中文
 
 1. **克隆或下载项目**
    ```bash
-   git clone https://github.com/zym9863/p5js-preview-tool.git
-   cd p5js-preview-tool
+   git clone https://github.com/zym9863/p5.js-preview-tool.git
+   cd p5.js-preview-tool
    ```
 
 2. **启动本地服务器**（可选）
